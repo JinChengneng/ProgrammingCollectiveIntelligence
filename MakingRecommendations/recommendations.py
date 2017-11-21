@@ -97,13 +97,84 @@ def transformPrefs(prefs):
             result[item][person] = prefs[person][item]
     return result
 
-# 基于用户的系统过来
-print(getRecommendations(critics,'Toby'))
-
-# 基于物品的协同过滤
-movies = transformPrefs(critics)
-print(topMatches(movies,'Superman Returns'))
+def calculateSimilarItems(movies, n=10):
+    result ={}
+    # 为大数据集显示进度
+    count = 0
+    for item in movies:
+        count+=1
+        if count % 100 == 0:
+            print(count, "/",len(movies))
+        scores = topMatches(movies, item, n=n, similarity=pearson_correlation_score)
+        result[item]=scores
+    return result
     
+def getRecommendedItems(prefs, similarItems, user):
+    userRatings = prefs[user]
+    scores = {}
+    totalSim = {}
+    
+    for(item, rating) in userRatings.items():
+        for (similarity, item2) in similarItems[item]:
+            if item2 in userRatings:
+                continue
+            scores.setdefault(item2,0)
+            scores[item2] += similarity*rating
+            
+            totalSim.setdefault(item2,0)
+            totalSim[item2] += similarity
+    
+    rankings = [(score/totalSim[item],item) for item,score in scores.items()]
+    rankings.sort()
+    rankings.reverse()
+    return rankings
+
+## 基于用户的协同过滤
+#print(getRecommendations(critics,'Toby'))
+# 
+## 基于物品的协同过滤
+#movies = transformPrefs(critics)
+#print(topMatches(movies,'Superman Returns'))
+ 
+# 构造物品比较数据集 
+#movies = transformPrefs(critics)
+#similarItems = calculateSimilarItems(movies)   
+#print(getRecommendedItems(critics,similarItems,'Toby'))
+    
+import csv
+# 使用MovieLens 数据集 
+def loadMovieLens(): 
+    input_csvFile = open("./data/movies.csv", "r",encoding = 'utf-8')
+    input_reader = csv.reader(input_csvFile)
+    movies={}
+    for line in input_reader:
+        if input_reader.line_num == 1:
+            continue
+        (id,title) = line[0:2]
+        movies[id] = title
+    
+    input_csvFile = open("./data/ratings.csv", "r",encoding = 'utf-8')
+    input_reader = csv.reader(input_csvFile)
+    prefs ={}
+    for line in input_reader:
+        if input_reader.line_num == 1:
+            continue
+        (user, movie, rating) = line[0:3]
+        prefs.setdefault(user,{})
+        prefs[user][movies[movie]] = float(rating)
+    
+    return prefs
+        
+prefs = loadMovieLens()
+
+# 基于用户进行过滤
+print(getRecommendations(prefs,'87')[0:200])
+
+# 基于物品进行过滤  
+movies = transformPrefs(prefs) 
+similarItems = calculateSimilarItems(movies)
+# 这个similarItems 就是物品比较数据集，最好可以保存一下，下次直接调用文件就行（但是懒啊orz
+print(getRecommendedItems(prefs, similarItems, '87')[0:300])      
     
     
     
